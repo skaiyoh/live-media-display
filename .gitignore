@@ -1,0 +1,7 @@
+# Secrets — never commit
+instagram_service/.env
+instagram_service/token.json
+
+# Generated at runtime
+instagram_service/followers.json
+__pycache__/
