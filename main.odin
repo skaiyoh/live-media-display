@@ -7,6 +7,9 @@ import "core:path/filepath"
 import "core:time"
 import rl "vendor:raylib"
 
+// Initial window size, and the design reference the on-screen layout is scaled
+// from. At runtime the window goes fullscreen and every position/size is scaled
+// to the actual screen height (see `scaled` and the draw loop).
 WINDOW_WIDTH  :: 1920
 WINDOW_HEIGHT :: 515
 WINDOW_TITLE  :: "UVULITES - Live Social Media Counter"
@@ -44,12 +47,24 @@ main :: proc() {
 	}
 	defer rl.CloseWindow()
 
+	rl.HideCursor() // kiosk display — no mouse pointer. Press ESC to quit.
+
 	rl.SetTargetFPS(60)
 
 	data_stale := true
 	last_fetch: f64 = -FETCH_INTERVAL // negative so the first frame fetches immediately
 
+	// Go fullscreen once the window is actually mapped. Toggling at InitWindow
+	// time is silently ignored by the Pi's window manager (the window stays
+	// below the desktop panel), so we defer it to the second frame.
+	frame := 0
+
 	for !rl.WindowShouldClose() {
+		frame += 1
+		if frame == 2 {
+			rl.ToggleBorderlessWindowed()
+		}
+
 		// --- Update ---
 		if now := rl.GetTime(); now - last_fetch >= FETCH_INTERVAL {
 			last_fetch = now
@@ -73,10 +88,11 @@ main :: proc() {
 
 		if counter.ts == 0 {
 			// Never fetched successfully yet.
-			draw_centered("Waiting for data...", (WINDOW_HEIGHT - 60) / 2, 60, rl.GRAY)
+			size := scaled(60)
+			draw_centered("Waiting for data...", (rl.GetScreenHeight() - size) / 2, size, rl.GRAY)
 		} else {
-			draw_centered(fmt.ctprintf("%s", counter.username), 100, 50, rl.GRAY)
-			draw_centered(fmt.ctprintf("%d", counter.followers_count), 190, 220, rl.DARKGRAY)
+			draw_centered(fmt.ctprintf("%s", counter.username), scaled(100), scaled(50), rl.GRAY)
+			draw_centered(fmt.ctprintf("%d", counter.followers_count), scaled(190), scaled(220), rl.DARKGRAY)
 
 			// Countdown to the service's next write. Derived from counter.ts
 			// every frame, so a fresh ts resets it automatically and it can
@@ -84,27 +100,33 @@ main :: proc() {
 			remaining := counter.ts + POLL_INTERVAL - int(time.to_unix_seconds(time.now()))
 			switch {
 			case remaining > 0:
-				draw_centered(fmt.ctprintf("next update in %ds", remaining), 440, 30, rl.GRAY)
+				draw_centered(fmt.ctprintf("next update in %ds", remaining), scaled(440), scaled(30), rl.GRAY)
 			case remaining > -OVERDUE_GRACE:
-				draw_centered("update due...", 440, 30, rl.GRAY)
+				draw_centered("update due...", scaled(440), scaled(30), rl.GRAY)
 			case:
-				draw_centered("update overdue", 440, 30, rl.ORANGE)
-                data_stale = true
+				draw_centered("update overdue", scaled(440), scaled(30), rl.ORANGE)
+				data_stale = true
 			}
 		}
 
 		if data_stale {
-			rl.DrawText("STALE", 20, 20, 30, rl.RED)
+			rl.DrawText("STALE", scaled(20), scaled(20), scaled(30), rl.RED)
 		}
 
 		free_all(context.temp_allocator) // frees the ctprintf strings
 	}
 }
 
-// Draw text horizontally centered in the window.
+// Draw text horizontally centered on screen.
 draw_centered :: proc(text: cstring, y, size: i32, color: rl.Color) {
 	width := rl.MeasureText(text, size)
-	rl.DrawText(text, (WINDOW_WIDTH - width) / 2, y, size, color)
+	rl.DrawText(text, (rl.GetScreenWidth() - width) / 2, y, size, color)
+}
+
+// Scale a measurement from the WINDOW_HEIGHT-tall design space to the current
+// screen, so the layout keeps its proportions at any fullscreen resolution.
+scaled :: proc(base: i32) -> i32 {
+	return i32(f32(base) * f32(rl.GetScreenHeight()) / f32(WINDOW_HEIGHT))
 }
 
 // Fetch the JSON from followers.json and return it as a Counter.
