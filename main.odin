@@ -33,6 +33,15 @@ counter: Counter
 
 main :: proc() {
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
+	// InitWindow doesn't abort on failure; if the GL context couldn't be
+	// created, calling CloseWindow below would segfault on an uninitialized
+	// render batch. Bail out early instead. On the Pi 4 the usual cause is the
+	// V3D driver only exposing desktop GL 3.1 — see run.sh for the fix.
+	if !rl.IsWindowReady() {
+		fmt.eprintln("Failed to open a window: no usable OpenGL context.")
+		fmt.eprintln("On Raspberry Pi, launch with ./run.sh (sets MESA_GL_VERSION_OVERRIDE=3.3).")
+		return
+	}
 	defer rl.CloseWindow()
 
 	rl.SetTargetFPS(60)

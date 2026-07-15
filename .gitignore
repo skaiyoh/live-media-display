@@ -5,3 +5,8 @@ instagram_service/token.json
 # Generated at runtime
 instagram_service/followers.json
 __pycache__/
+
+# Odin build output (named after the package dir; `odin run` leaves it if killed)
+/uvulites-media-display
+*-dbg
+*-display
