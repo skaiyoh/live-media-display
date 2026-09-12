@@ -7,6 +7,6 @@ instagram_service/followers.json
 __pycache__/
 
 # Odin build output (named after the package dir; `odin run` leaves it if killed)
-/uvulites-media-display
+/live-media-display
 *-dbg
 *-display
